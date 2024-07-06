@@ -1,9 +1,11 @@
-package de.mxapplications.simplemvi
+package de.mxapplications.android.sqlclient.ui
 
 import androidx.lifecycle.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.properties.ReadWriteProperty
+import kotlin.reflect.KProperty
 
 /**
  * Interface that represents an MVI Model. You should use data classes if possible to implement this interface. The reason is that the equals() method of your State will be used if it is the same as the last one. If it is the same, it will not be forwarded to [Renderer.render].
@@ -72,17 +74,18 @@ abstract class Presenter<S: State, A: Action>: ViewModel() {
      * Gives access to the last processed [Action].
      */
     var lastAction: Action? = null
-    private set
+        private set
 
-    private val state: LiveData<S> by lazy {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val state: LiveData<S> by lazy {
         createStateFlow().asLiveData()
     }
 
     /**
      * Gives access to the last [State] as it was rendered.
      */
-    var lastState: S? = null
-    private set
+    var lastState by LazyMutable { startingState() }
+        private set
 
     /**
      * This method can be implemented to return a flow of [Action]s from a data source (e.g. REST calls, database updates).
@@ -177,5 +180,20 @@ abstract class Presenter<S: State, A: Action>: ViewModel() {
                 actionFlow.emit(it)
             }
         }
+    }
+}
+
+private class LazyMutable<T> (
+    val init: () -> T
+): ReadWriteProperty<Any?, T> {
+    val value by lazy { init() }
+    var newValue: T? = null
+
+    override fun getValue(thisRef: Any?, property: KProperty<*>): T {
+        return newValue ?: value
+    }
+
+    override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+        newValue = value
     }
 }
